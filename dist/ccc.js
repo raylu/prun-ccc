@@ -1690,14 +1690,6 @@ function property(options) {
     return typeof nameOrContext === "object" ? standardProperty(options, protoOrTarget, nameOrContext) : legacyProperty(options, protoOrTarget, nameOrContext);
   };
 }
-// node_modules/@lit/reactive-element/development/decorators/state.js
-function state(options) {
-  return property({
-    ...options,
-    state: true,
-    attribute: false
-  });
-}
 // node_modules/@lit/reactive-element/development/decorators/query.js
 var DEV_MODE5 = true;
 var issueWarning5;
@@ -1759,6 +1751,7 @@ class CCCTable extends LitElement {
     });
   }
   renderTable(priceMap) {
+    const total = this.count.entries().reduce((acc, [ticker, count]) => acc + (count * reducedPrices[ticker] || 0), 0);
     return html`
 		<table>
 			<thead>
@@ -1777,7 +1770,7 @@ class CCCTable extends LitElement {
 					<td></td>
 					<td></td>
 					<td>total</td>
-					<td>${this.count.entries().reduce((acc, [ticker, count]) => acc + (count * reducedPrices[ticker] || 0), 0)}</td>
+					<td>${fmt.format(total)}</td>
 				</tr>
 			</tbody>
 		</table>
@@ -1825,13 +1818,49 @@ class CCCTable extends LitElement {
 	`;
 }
 __legacyDecorateClassTS([
-  state()
+  property({ attribute: false })
 ], CCCTable.prototype, "count", undefined);
 CCCTable = __legacyDecorateClassTS([
   customElement("ccc-table")
 ], CCCTable);
+var buildings = null;
+async function fetchBuildings() {
+  if (buildings)
+    return buildings;
+  const rawBuildings = await (await fetch("https://api.prunplanner.org/data/buildings")).json();
+  buildings = new Map;
+  for (const building of rawBuildings)
+    buildings.set(building.Ticker, building.BuildingCosts);
+  return buildings;
+}
+document.querySelector('input[type="button"]').addEventListener("click", async () => {
+  const url = new URL(document.querySelector('input[type="url"]').value);
+  if (url.hostname !== "prunplanner.org") {
+    alert("invalid prunplan");
+    return;
+  }
+  url.hostname = "api.prunplanner.org";
+  const [planResponse, buildings2] = await Promise.all([fetch(url), fetchBuildings()]);
+  const plan = await planResponse.json();
+  const cccTable = document.querySelector("ccc-table");
+  const count = cccTable.count;
+  count.clear();
+  for (const building of plan.baseplanner.baseplanner_data.buildings)
+    for (const mat of buildings2.get(building.name))
+      if (mat.CommodityTicker in reducedPrices) {
+        const ticker = mat.CommodityTicker;
+        count.set(ticker, (count.get(ticker) ?? 0) + building.amount * mat.Amount);
+      }
+  for (const infra of plan.baseplanner.baseplanner_data.infrastructure)
+    for (const mat of buildings2.get(infra.building))
+      if (mat.CommodityTicker in reducedPrices) {
+        const ticker = mat.CommodityTicker;
+        count.set(ticker, (count.get(ticker) ?? 0) + infra.amount * mat.Amount);
+      }
+  cccTable.requestUpdate();
+});
 export {
   CCCTable
 };
 
-//# debugId=5EBE1EA7F5A7884764756E2164756E21
+//# debugId=818C1136F9FCACF464756E2164756E21
