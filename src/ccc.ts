@@ -1,6 +1,6 @@
 import {Task} from "@lit/task";
 import {css, html, LitElement} from "lit";
-import {customElement, state} from "lit/decorators.js";
+import {customElement, property} from "lit/decorators.js";
 
 const reducedPrices = {
 	BSE: 507,
@@ -24,12 +24,32 @@ interface Price {
 	TradedYesterday: number;
 }
 
+interface Building {
+	Ticker: string;
+	BuildingCosts: BuildingMat[];
+}
+
+interface BuildingMat {
+	CommodityTicker: string;
+	Amount: number;
+}
+
+interface Plan {
+	baseplanner: {
+		name: string;
+		baseplanner_data: {
+			infrastructure: {building: string, amount: number}[];
+			buildings: {name: string, amount: number}[];
+		}
+	}
+}
+
 const fmt = new Intl.NumberFormat(undefined, {maximumFractionDigits: 0});
 
 @customElement('ccc-table')
 export class CCCTable extends LitElement {
-	@state()
-	private count: Map<keyof typeof reducedPrices, number> = new Map();
+	@property({attribute: false})
+	count: Map<keyof typeof reducedPrices, number> = new Map();
 
 	private priceTask = new Task(this, {
 		task: async (_args, {signal}): Promise<Map<keyof typeof reducedPrices, number>> => {
@@ -133,3 +153,40 @@ export class CCCTable extends LitElement {
 		}
 	`;
 }
+
+let buildings: Map<string, BuildingMat[]> | null = null;
+async function fetchBuildings(): Promise<Map<string, BuildingMat[]>> {
+	if (buildings) return buildings;
+	const rawBuildings = await (await fetch('https://api.prunplanner.org/data/buildings')).json() as Building[];
+	buildings = new Map<string, BuildingMat[]>();
+	for (const building of rawBuildings)
+		buildings.set(building.Ticker, building.BuildingCosts);
+	return buildings;
+}
+document.querySelector('input[type="button"]')!.addEventListener('click', async () => {
+	const url = new URL(document.querySelector<HTMLInputElement>('input[type="url"]')!.value);
+	if (url.hostname !== 'prunplanner.org') {
+		alert('invalid prunplan');
+		return;
+	}
+	url.hostname = 'api.prunplanner.org';
+	const [planResponse, buildings] = await Promise.all([fetch(url), fetchBuildings()]);
+	const plan = await planResponse.json() as Plan;
+
+	const cccTable = document.querySelector<CCCTable>('ccc-table')!;
+	const count = cccTable.count;
+	count.clear();
+	for (const building of plan.baseplanner.baseplanner_data.buildings) 
+		for (const mat of buildings.get(building.name)!) 
+			if (mat.CommodityTicker in reducedPrices)  {
+				const ticker = mat.CommodityTicker as keyof typeof reducedPrices;
+				count.set(ticker, (count.get(ticker) ?? 0) + building.amount * mat.Amount);
+			}
+	for (const infra of plan.baseplanner.baseplanner_data.infrastructure) 
+		for (const mat of buildings.get(infra.building)!) 
+			if (mat.CommodityTicker in reducedPrices) {
+				const ticker = mat.CommodityTicker as keyof typeof reducedPrices;
+				count.set(ticker, (count.get(ticker) ?? 0) + infra.amount * mat.Amount);
+			}
+	cccTable.requestUpdate();
+});
