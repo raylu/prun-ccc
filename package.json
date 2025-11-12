@@ -9,5 +9,9 @@
   },
   "devDependencies": {
     "typescript": "^5.2.0"
+  },
+  "dependencies": {
+    "@lit/task": "^1.0.3",
+    "lit": "^3.3.1"
   }
 }

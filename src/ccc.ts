@@ -1,3 +1,7 @@
+import {Task} from "@lit/task";
+import {css, html, LitElement} from "lit";
+import {customElement, state} from "lit/decorators.js";
+
 const reducedPrices = {
 	BSE: 507,
 	BBH: 801,
@@ -20,34 +24,112 @@ interface Price {
 	TradedYesterday: number;
 }
 
-async function fetchPrices(): Promise<Price[]> {
-	return await (await fetch('https://refined-prun.github.io/refined-prices/all.json')).json();
-}
+const fmt = new Intl.NumberFormat(undefined, {maximumFractionDigits: 0});
 
-function renderPrices(prices: Price[]) {
-	const priceMap = new Map<keyof typeof reducedPrices, number>();
-	for (const ticker of Object.keys(reducedPrices) as Array<keyof typeof reducedPrices>) {
-		let total = 0;
-		let traded = 0;
-		for (const price of prices)
-			if (price.MaterialTicker === ticker && price.ExchangeCode.endsWith('1')) {
-				total += price.PriceAverage * price.TradedYesterday;
-				traded += price.TradedYesterday;
+@customElement('ccc-table')
+export class CCCTable extends LitElement {
+	@state()
+	private count: Map<keyof typeof reducedPrices, number> = new Map();
+
+	private priceTask = new Task(this, {
+		task: async (_args, {signal}): Promise<Map<keyof typeof reducedPrices, number>> => {
+			const prices: Price[] = await (await fetch('https://refined-prun.github.io/refined-prices/all.json', {signal})).json();
+
+			const priceMap = new Map<keyof typeof reducedPrices, number>();
+			for (const ticker of Object.keys(reducedPrices) as Array<keyof typeof reducedPrices>) {
+				let total = 0;
+				let traded = 0;
+				for (const price of prices)
+					if (price.MaterialTicker === ticker && price.ExchangeCode.endsWith('1')) {
+						total += price.PriceAverage * price.TradedYesterday;
+						traded += price.TradedYesterday;
+					}
+				priceMap.set(ticker, total / traded);
 			}
-		priceMap.set(ticker, total / traded);
+			return priceMap;
+		},
+	});
+
+	constructor() {
+		super();
+		this.priceTask.run();
 	}
 
-	const fmt = new Intl.NumberFormat(undefined, {maximumFractionDigits: 0});
-	const tbody = document.querySelector('tbody') as HTMLTableSectionElement;
-	for (const [ticker, price] of priceMap) {
-		const row = document.createElement('tr');
-		row.innerHTML = `
+	protected render() {
+		return this.priceTask.render({
+			pending: () => html`loading...`,
+			rejected: (e: Error) => html`error loading prices: ${e.message}`,
+			complete: (priceMap) => this.renderTable(priceMap),
+		});
+	}
+
+	private renderTable(priceMap: Map<keyof typeof reducedPrices, number>) {
+		const total = this.count.entries().reduce((acc, [ticker, count]) => acc + (count * reducedPrices[ticker] || 0), 0);
+		return html`
+		<table>
+			<thead>
+				<tr>
+					<th>material</th>
+					<th>regular<br>price</th>
+					<th>reduced<br>price</th>
+					<th>count</th>
+					<th>cost</th>
+				</tr>
+			</thead>
+			<tbody>
+				${priceMap.entries().map(([ticker, price]) => this.renderRow(ticker, price, this.count.get(ticker)))}
+				<tr>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td>total</td>
+					<td>${fmt.format(total)}</td>
+				</tr>
+			</tbody>
+		</table>
+		`;
+	}
+
+	private renderRow(ticker: keyof typeof reducedPrices, price: number, count: number | undefined) {
+		return html`
+		<tr>
 			<td>${ticker}</td>
 			<td>${fmt.format(price)}</td>
 			<td>${fmt.format(reducedPrices[ticker])}</td>
+			<td><input type="number" value="${count}" min="0" @input="${(e: Event) => this.onInputChange(e, ticker)}"></td>
+			<td>${count && fmt.format(count * reducedPrices[ticker])}</td>
+		</tr>
 		`;
-		tbody.appendChild(row);
 	}
-}
 
-fetchPrices().then(renderPrices);
+	private onInputChange(e: Event, ticker: keyof typeof reducedPrices) {
+		const input = e.target as HTMLInputElement;
+		const value = parseInt(input.value);
+		if (!isNaN(value)) {
+			this.count.set(ticker, value);
+			this.requestUpdate();
+		}
+	}
+
+	static styles = css`
+		td {
+			text-align: right;
+			padding: 0.25em 1em;
+		}
+		td:first-child {
+			text-align: inherit;
+			padding-left: 0;
+		}
+		td:last-child {
+			padding-right: 0;
+		}
+
+		input {
+			background-color: #222;
+			color: inherit;
+			border: 1px solid #777;
+			padding: 0.25em;
+			width: 5em;
+		}
+	`;
+}
