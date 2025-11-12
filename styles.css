@@ -1,0 +1,38 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: monospace;
+    font-size: 14pt;
+    background-color: #000;
+    color: #eee;
+}
+
+main {
+    max-width: 1200px;
+    margin: 1em auto;
+    padding: 1em;
+    background: #111;
+}
+
+h1 {
+    margin: 0 0 1em;
+}
+
+a {
+    color: #0af;
+}
+
+td {
+    text-align: right;
+    padding: 0.25em 1em;
+}
+td:first-child {
+    text-align: inherit;
+    padding-left: 0;
+}
+td:last-child {
+    padding-right: 0;
+}
+

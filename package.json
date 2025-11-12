@@ -1,0 +1,13 @@
+{
+  "name": "prun-cccc",
+  "version": "1.0.0",
+  "description": "Corriild's Construction Center",
+  "scripts": {
+    "build": "bun build src/ccc.ts --outdir dist --target browser --sourcemap=external",
+    "typecheck": "tsc --noEmit",
+    "serve": "python3 -m http.server 8000"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.0"
+  }
+}
