@@ -1797,6 +1797,7 @@ class CCCTable extends LitElement {
   }
   static styles = css`
 		td {
+			font-family: monospace;
 			text-align: right;
 			padding: 0.25em 1em;
 		}
@@ -1863,4 +1864,4 @@ export {
   CCCTable
 };
 
-//# debugId=818C1136F9FCACF464756E2164756E21
+//# debugId=F2C8DB82B7A55E9A64756E2164756E21
