@@ -133,6 +133,7 @@ export class CCCTable extends LitElement {
 
 	static styles = css`
 		td {
+			font-family: monospace;
 			text-align: right;
 			padding: 0.25em 1em;
 		}
