@@ -167,7 +167,10 @@ export class CCCTable extends LitElement {
 
 	private onInputChange(e: Event, ticker: keyof typeof reducedPrices) {
 		const input = e.target as HTMLInputElement;
-		if (!isNaN(input.valueAsNumber)) {
+		if (input.value === '') {
+			this.count.delete(ticker);
+			this.requestUpdate('count');
+		} else if (!isNaN(input.valueAsNumber)) {
 			this.count.set(ticker, input.valueAsNumber);
 			this.requestUpdate('count');
 		}

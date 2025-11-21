@@ -1829,7 +1829,10 @@ class CCCTable extends LitElement {
   }
   onInputChange(e, ticker) {
     const input = e.target;
-    if (!isNaN(input.valueAsNumber)) {
+    if (input.value === "") {
+      this.count.delete(ticker);
+      this.requestUpdate("count");
+    } else if (!isNaN(input.valueAsNumber)) {
       this.count.set(ticker, input.valueAsNumber);
       this.requestUpdate("count");
     }
@@ -1911,4 +1914,4 @@ export {
   CCCTable
 };
 
-//# debugId=FBCB72EF893A893164756E2164756E21
+//# debugId=093D1E72DAD3DD7A64756E2164756E21
