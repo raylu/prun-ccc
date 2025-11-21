@@ -1,5 +1,5 @@
 import {Task} from "@lit/task";
-import {css, html, LitElement} from "lit";
+import {css, html, LitElement, nothing} from "lit";
 import {customElement, property} from "lit/decorators.js";
 
 const reducedPrices = {
@@ -116,7 +116,7 @@ export class CCCTable extends LitElement {
 			<td>${ticker}</td>
 			<td>${fmt.format(price)}</td>
 			<td>${fmt.format(reducedPrices[ticker])}</td>
-			<td><input type="number" value="${count}" min="0" @input="${(e: Event) => this.onInputChange(e, ticker)}"></td>
+			<td><input type="number" .value=${count} min="0" @input="${(e: Event) => this.onInputChange(e, ticker)}"></td>
 			<td>${count && fmt.format(count * reducedPrices[ticker])}</td>
 		</tr>
 		`;
@@ -124,9 +124,8 @@ export class CCCTable extends LitElement {
 
 	private onInputChange(e: Event, ticker: keyof typeof reducedPrices) {
 		const input = e.target as HTMLInputElement;
-		const value = parseInt(input.value);
-		if (!isNaN(value)) {
-			this.count.set(ticker, value);
+		if (!isNaN(input.valueAsNumber)) {
+			this.count.set(ticker, input.valueAsNumber);
 			this.requestUpdate();
 		}
 	}

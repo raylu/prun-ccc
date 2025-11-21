@@ -1782,16 +1782,15 @@ class CCCTable extends LitElement {
 			<td>${ticker}</td>
 			<td>${fmt.format(price)}</td>
 			<td>${fmt.format(reducedPrices[ticker])}</td>
-			<td><input type="number" value="${count}" min="0" @input="${(e) => this.onInputChange(e, ticker)}"></td>
+			<td><input type="number" .value=${count} min="0" @input="${(e) => this.onInputChange(e, ticker)}"></td>
 			<td>${count && fmt.format(count * reducedPrices[ticker])}</td>
 		</tr>
 		`;
   }
   onInputChange(e, ticker) {
     const input = e.target;
-    const value = parseInt(input.value);
-    if (!isNaN(value)) {
-      this.count.set(ticker, value);
+    if (!isNaN(input.valueAsNumber)) {
+      this.count.set(ticker, input.valueAsNumber);
       this.requestUpdate();
     }
   }
@@ -1864,4 +1863,4 @@ export {
   CCCTable
 };
 
-//# debugId=F2C8DB82B7A55E9A64756E2164756E21
+//# debugId=38F965704D3F8B0164756E2164756E21
