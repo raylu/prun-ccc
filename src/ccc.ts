@@ -2,19 +2,48 @@ import {Task} from '@lit/task';
 import {css, html, LitElement} from 'lit';
 import {customElement, property} from 'lit/decorators.js';
 
-const reducedPrices = {
-	BSE: 507,
+const reducedPrices: Record<keyof typeof regularPrices, number | null> = {
+	AEF: null,
 	BBH: 801,
 	BDE: 1900,
+	BSE: 507,
 	BTA: 1125,
-	LSE: 3086,
+	HSE: null,
+	INS: null,
 	LBH: 1577,
 	LDE: 9869,
+	LSE: 3086,
 	LTA: 3037,
 	MCG: 9,
-	TRU: 170,
+	MHL: null,
 	PSL: 1000,
-	INS: 125,
+	RBH: null,
+	RDE: null,
+	RSE: null,
+	RTA: null,
+	TRU: 170,
+} as const;
+
+const regularPrices = {
+	AEF: 4200,
+	BBH: 2300,
+	BDE: 2200,
+	BSE: 1450,
+	BTA: 1250,
+	HSE: 13000,
+	INS: 160,
+	LBH: 4600,
+	LDE: 10000,
+	LSE: 9500,
+	LTA: 3700,
+	MCG: 30,
+	MHL: 4600,
+	PSL: 4200,
+	RBH: 15550,
+	RDE: 34000,
+	RSE: 25000,
+	RTA: 15500,
+	TRU: 500,
 } as const;
 
 interface Price {
@@ -49,14 +78,14 @@ const fmt = new Intl.NumberFormat(undefined, {maximumFractionDigits: 0});
 @customElement('ccc-table')
 export class CCCTable extends LitElement {
 	@property({attribute: false})
-	count: Map<keyof typeof reducedPrices, number> = new Map();
+	count: Map<keyof typeof regularPrices, number> = new Map();
 
 	private priceTask = new Task(this, {
-		task: async (_args, {signal}): Promise<Map<keyof typeof reducedPrices, number>> => {
+		task: async (_args, {signal}): Promise<Map<keyof typeof regularPrices, number>> => {
 			const prices: Price[] = await (await fetch('https://refined-prun.github.io/refined-prices/all.json', {signal})).json();
 
-			const priceMap = new Map<keyof typeof reducedPrices, number>();
-			for (const ticker of Object.keys(reducedPrices) as Array<keyof typeof reducedPrices>) {
+			const priceMap = new Map<keyof typeof regularPrices, number>();
+			for (const ticker of Object.keys(regularPrices) as Array<keyof typeof regularPrices>) {
 				let total = 0;
 				let traded = 0;
 				for (const price of prices)
@@ -90,17 +119,20 @@ export class CCCTable extends LitElement {
 		history.pushState({}, '', '#' + [...this.count.entries().map(([k, v]) => `${k}=${v}`)].join('&'));
 	}
 
-	private renderTable(priceMap: Map<keyof typeof reducedPrices, number>) {
-		const total = this.count.entries().reduce((acc, [ticker, count]) => acc + (count * reducedPrices[ticker] || 0), 0);
+	private renderTable(priceMap: Map<keyof typeof regularPrices, number>) {
+		const reducedTotal = this.count.entries().reduce((acc, [ticker, count]) => acc + (count * (reducedPrices[ticker] ?? regularPrices[ticker])), 0);
+		const regularTotal = this.count.entries().reduce((acc, [ticker, count]) => acc + (count * regularPrices[ticker]), 0);
 		return html`
 		<table>
 			<thead>
 				<tr>
 					<th>material</th>
-					<th>regular<br>price</th>
+					<th>CX<br>price</th>
 					<th>reduced<br>price</th>
+					<th>regular<br>price</th>
 					<th>count</th>
-					<th>cost</th>
+					<th>reduced<br>cost</th>
+					<th>regular<br>cost</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -109,22 +141,26 @@ export class CCCTable extends LitElement {
 					<td></td>
 					<td></td>
 					<td></td>
+					<td></td>
 					<td>total</td>
-					<td>${fmt.format(total)}</td>
+					<td>${fmt.format(reducedTotal)}</td>
+					<td>${fmt.format(regularTotal)}</td>
 				</tr>
 			</tbody>
 		</table>
 		`;
 	}
 
-	private renderRow(ticker: keyof typeof reducedPrices, price: number, count: number | undefined) {
+	private renderRow(ticker: keyof typeof regularPrices, price: number, count: number | undefined) {
 		return html`
 		<tr>
 			<td>${ticker}</td>
 			<td>${fmt.format(price)}</td>
-			<td>${fmt.format(reducedPrices[ticker])}</td>
+			<td>${reducedPrices[ticker] ? fmt.format(reducedPrices[ticker]) : ''}</td>
+			<td>${fmt.format(regularPrices[ticker])}</td>
 			<td><input type="number" .value=${count} min="0" @input="${(e: Event) => this.onInputChange(e, ticker)}"></td>
-			<td>${count && fmt.format(count * reducedPrices[ticker])}</td>
+			<td>${count && fmt.format(count * (reducedPrices[ticker] || regularPrices[ticker]))}</td>
+			<td>${count && fmt.format(count * regularPrices[ticker])}</td>
 		</tr>
 		`;
 	}
@@ -191,15 +227,17 @@ document.querySelector('input[type="button"]')!.addEventListener('click', async 
 	count.clear();
 	for (const building of plan.baseplanner.baseplanner_data.buildings) 
 		for (const mat of buildings.get(building.name)!) 
-			if (mat.CommodityTicker in reducedPrices)  {
-				const ticker = mat.CommodityTicker as keyof typeof reducedPrices;
+			if (mat.CommodityTicker in regularPrices) {
+				const ticker = mat.CommodityTicker as keyof typeof regularPrices;
 				count.set(ticker, (count.get(ticker) ?? 0) + building.amount * mat.Amount);
 			}
-	for (const infra of plan.baseplanner.baseplanner_data.infrastructure) 
-		for (const mat of buildings.get(infra.building)!) 
-			if (mat.CommodityTicker in reducedPrices) {
-				const ticker = mat.CommodityTicker as keyof typeof reducedPrices;
+	for (const infra of plan.baseplanner.baseplanner_data.infrastructure) {
+		if (infra.amount === 0) continue;
+		for (const mat of buildings.get(infra.building)!)
+			if (mat.CommodityTicker in regularPrices) {
+				const ticker = mat.CommodityTicker as keyof typeof regularPrices;
 				count.set(ticker, (count.get(ticker) ?? 0) + infra.amount * mat.Amount);
 			}
+	}
 	cccTable.requestUpdate('count');
 });
