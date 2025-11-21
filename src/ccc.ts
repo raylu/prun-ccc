@@ -1,6 +1,6 @@
-import {Task} from "@lit/task";
-import {css, html, LitElement, nothing} from "lit";
-import {customElement, property} from "lit/decorators.js";
+import {Task} from '@lit/task';
+import {css, html, LitElement} from 'lit';
+import {customElement, property} from 'lit/decorators.js';
 
 const reducedPrices = {
 	BSE: 507,
@@ -83,6 +83,13 @@ export class CCCTable extends LitElement {
 		});
 	}
 
+	protected updated(changedProperties: Map<string, any>) {
+		if (!changedProperties.has('count') || !this.count.size)
+			return;
+		// oxlint-disable-next-line no-useless-spread
+		history.pushState({}, '', '#' + [...this.count.entries().map(([k, v]) => `${k}=${v}`)].join('&'));
+	}
+
 	private renderTable(priceMap: Map<keyof typeof reducedPrices, number>) {
 		const total = this.count.entries().reduce((acc, [ticker, count]) => acc + (count * reducedPrices[ticker] || 0), 0);
 		return html`
@@ -126,7 +133,7 @@ export class CCCTable extends LitElement {
 		const input = e.target as HTMLInputElement;
 		if (!isNaN(input.valueAsNumber)) {
 			this.count.set(ticker, input.valueAsNumber);
-			this.requestUpdate();
+			this.requestUpdate('count');
 		}
 	}
 
@@ -154,6 +161,13 @@ export class CCCTable extends LitElement {
 	`;
 }
 
+const cccTable = document.querySelector<CCCTable>('ccc-table')!;
+if (document.location.hash.slice(1))
+	for (const param of document.location.hash.slice(1).split('&')) {
+		const [key, value] = param.split('=');
+		cccTable.count.set(key as keyof typeof reducedPrices, Number(value));
+	};
+
 let buildings: Map<string, BuildingMat[]> | null = null;
 async function fetchBuildings(): Promise<Map<string, BuildingMat[]>> {
 	if (buildings) return buildings;
@@ -173,7 +187,6 @@ document.querySelector('input[type="button"]')!.addEventListener('click', async 
 	const [planResponse, buildings] = await Promise.all([fetch(url), fetchBuildings()]);
 	const plan = await planResponse.json() as Plan;
 
-	const cccTable = document.querySelector<CCCTable>('ccc-table')!;
 	const count = cccTable.count;
 	count.clear();
 	for (const building of plan.baseplanner.baseplanner_data.buildings) 
@@ -188,5 +201,5 @@ document.querySelector('input[type="button"]')!.addEventListener('click', async 
 				const ticker = mat.CommodityTicker as keyof typeof reducedPrices;
 				count.set(ticker, (count.get(ticker) ?? 0) + infra.amount * mat.Amount);
 			}
-	cccTable.requestUpdate();
+	cccTable.requestUpdate('count');
 });

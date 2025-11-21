@@ -1750,6 +1750,11 @@ class CCCTable extends LitElement {
       complete: (priceMap) => this.renderTable(priceMap)
     });
   }
+  updated(changedProperties) {
+    if (!changedProperties.has("count") || !this.count.size)
+      return;
+    history.pushState({}, "", "#" + [...this.count.entries().map(([k, v]) => `${k}=${v}`)].join("&"));
+  }
   renderTable(priceMap) {
     const total = this.count.entries().reduce((acc, [ticker, count]) => acc + (count * reducedPrices[ticker] || 0), 0);
     return html`
@@ -1791,7 +1796,7 @@ class CCCTable extends LitElement {
     const input = e.target;
     if (!isNaN(input.valueAsNumber)) {
       this.count.set(ticker, input.valueAsNumber);
-      this.requestUpdate();
+      this.requestUpdate("count");
     }
   }
   static styles = css`
@@ -1823,6 +1828,12 @@ __legacyDecorateClassTS([
 CCCTable = __legacyDecorateClassTS([
   customElement("ccc-table")
 ], CCCTable);
+var cccTable = document.querySelector("ccc-table");
+if (document.location.hash.slice(1))
+  for (const param of document.location.hash.slice(1).split("&")) {
+    const [key, value] = param.split("=");
+    cccTable.count.set(key, Number(value));
+  }
 var buildings = null;
 async function fetchBuildings() {
   if (buildings)
@@ -1842,7 +1853,6 @@ document.querySelector('input[type="button"]').addEventListener("click", async (
   url.hostname = "api.prunplanner.org";
   const [planResponse, buildings2] = await Promise.all([fetch(url), fetchBuildings()]);
   const plan = await planResponse.json();
-  const cccTable = document.querySelector("ccc-table");
   const count = cccTable.count;
   count.clear();
   for (const building of plan.baseplanner.baseplanner_data.buildings)
@@ -1857,10 +1867,10 @@ document.querySelector('input[type="button"]').addEventListener("click", async (
         const ticker = mat.CommodityTicker;
         count.set(ticker, (count.get(ticker) ?? 0) + infra.amount * mat.Amount);
       }
-  cccTable.requestUpdate();
+  cccTable.requestUpdate("count");
 });
 export {
   CCCTable
 };
 
-//# debugId=38F965704D3F8B0164756E2164756E21
+//# debugId=EDD8208466CC8F5364756E2164756E21
