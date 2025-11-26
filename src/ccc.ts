@@ -55,6 +55,7 @@ interface Price {
 
 interface Building {
 	Ticker: string;
+	AreaCost: number;
 	BuildingCosts: BuildingMat[];
 }
 
@@ -67,10 +68,17 @@ interface Plan {
 	baseplanner: {
 		name: string;
 		baseplanner_data: {
+			planet: {planetid: string}
 			infrastructure: {building: string, amount: number}[];
 			buildings: {name: string, amount: number}[];
 		}
 	}
+}
+interface Planet {
+	Surface: boolean;
+	Pressure: number;
+	Temperature: number;
+	Gravity: number;
 }
 
 const fmt = new Intl.NumberFormat(undefined, {maximumFractionDigits: 0});
@@ -207,13 +215,13 @@ if (document.location.hash.slice(1))
 		cccTable.count.set(key as keyof typeof reducedPrices, Number(value));
 	};
 
-let buildings: Map<string, BuildingMat[]> | null = null;
-async function fetchBuildings(): Promise<Map<string, BuildingMat[]>> {
+let buildings: Map<string, Building> | null = null;
+async function fetchBuildings(): Promise<Map<string, Building>> {
 	if (buildings) return buildings;
 	const rawBuildings = await (await fetch('https://api.prunplanner.org/data/buildings')).json() as Building[];
-	buildings = new Map<string, BuildingMat[]>();
+	buildings = new Map<string, Building>();
 	for (const building of rawBuildings)
-		buildings.set(building.Ticker, building.BuildingCosts);
+		buildings.set(building.Ticker, building);
 	return buildings;
 }
 document.querySelector('input[type="button"]')!.addEventListener('click', async () => {
@@ -226,17 +234,26 @@ document.querySelector('input[type="button"]')!.addEventListener('click', async 
 	const [planResponse, buildings] = await Promise.all([fetch(url), fetchBuildings()]);
 	const plan = await planResponse.json() as Plan;
 
+	const planetResponse = await fetch('https://api.prunplanner.org/data/planet/' +
+		plan.baseplanner.baseplanner_data.planet.planetid);
+	const planet: Planet = await planetResponse.json();
+
 	const count = cccTable.count;
 	count.clear();
+	for (const mat of mats(buildings.get('CM')!, planet))
+		if (mat.CommodityTicker in reducedPrices)  {
+			const ticker = mat.CommodityTicker as keyof typeof reducedPrices;
+			count.set(ticker, mat.Amount);
+		}
 	for (const building of plan.baseplanner.baseplanner_data.buildings) 
-		for (const mat of buildings.get(building.name)!) 
+		for (const mat of mats(buildings.get(building.name)!, planet)) 
 			if (mat.CommodityTicker in regularPrices) {
 				const ticker = mat.CommodityTicker as keyof typeof regularPrices;
 				count.set(ticker, (count.get(ticker) ?? 0) + building.amount * mat.Amount);
 			}
 	for (const infra of plan.baseplanner.baseplanner_data.infrastructure) {
 		if (infra.amount === 0) continue;
-		for (const mat of buildings.get(infra.building)!)
+		for (const mat of mats(buildings.get(infra.building)!, planet))
 			if (mat.CommodityTicker in regularPrices) {
 				const ticker = mat.CommodityTicker as keyof typeof regularPrices;
 				count.set(ticker, (count.get(ticker) ?? 0) + infra.amount * mat.Amount);
@@ -244,3 +261,24 @@ document.querySelector('input[type="button"]')!.addEventListener('click', async 
 	}
 	cccTable.requestUpdate('count');
 });
+
+function *mats(building: Building, planet: Planet): Iterable<BuildingMat> {
+	for (const mat of building.BuildingCosts)
+		yield mat;
+
+	if (planet.Surface) // rocky
+		yield {CommodityTicker: 'MCG', Amount: building.AreaCost * 4};
+	else // gaseous
+		yield {CommodityTicker: 'AEF', Amount: Math.ceil(building.AreaCost / 3)};
+
+	// ignore gravity because CCC doesn't have MGC or BL
+
+	if (planet.Pressure > 2)
+		yield {CommodityTicker: 'HSE', Amount: 1};
+	// ignore low pressure because CCC doesn't have SEA
+
+	// Temperature
+	if (planet.Temperature < -25)
+		yield {CommodityTicker: 'INS', Amount: building.AreaCost * 10};
+	// ignore high temperature because CCC doesn't have TSH
+}

@@ -1879,7 +1879,7 @@ async function fetchBuildings() {
   const rawBuildings = await (await fetch("https://api.prunplanner.org/data/buildings")).json();
   buildings = new Map;
   for (const building of rawBuildings)
-    buildings.set(building.Ticker, building.BuildingCosts);
+    buildings.set(building.Ticker, building);
   return buildings;
 }
 document.querySelector('input[type="button"]').addEventListener("click", async () => {
@@ -1891,10 +1891,17 @@ document.querySelector('input[type="button"]').addEventListener("click", async (
   url.hostname = "api.prunplanner.org";
   const [planResponse, buildings2] = await Promise.all([fetch(url), fetchBuildings()]);
   const plan = await planResponse.json();
+  const planetResponse = await fetch("https://api.prunplanner.org/data/planet/" + plan.baseplanner.baseplanner_data.planet.planetid);
+  const planet = await planetResponse.json();
   const count = cccTable.count;
   count.clear();
+  for (const mat of mats(buildings2.get("CM"), planet))
+    if (mat.CommodityTicker in reducedPrices) {
+      const ticker = mat.CommodityTicker;
+      count.set(ticker, mat.Amount);
+    }
   for (const building of plan.baseplanner.baseplanner_data.buildings)
-    for (const mat of buildings2.get(building.name))
+    for (const mat of mats(buildings2.get(building.name), planet))
       if (mat.CommodityTicker in regularPrices) {
         const ticker = mat.CommodityTicker;
         count.set(ticker, (count.get(ticker) ?? 0) + building.amount * mat.Amount);
@@ -1902,7 +1909,7 @@ document.querySelector('input[type="button"]').addEventListener("click", async (
   for (const infra of plan.baseplanner.baseplanner_data.infrastructure) {
     if (infra.amount === 0)
       continue;
-    for (const mat of buildings2.get(infra.building))
+    for (const mat of mats(buildings2.get(infra.building), planet))
       if (mat.CommodityTicker in regularPrices) {
         const ticker = mat.CommodityTicker;
         count.set(ticker, (count.get(ticker) ?? 0) + infra.amount * mat.Amount);
@@ -1910,8 +1917,20 @@ document.querySelector('input[type="button"]').addEventListener("click", async (
   }
   cccTable.requestUpdate("count");
 });
+function* mats(building, planet) {
+  for (const mat of building.BuildingCosts)
+    yield mat;
+  if (planet.Surface)
+    yield { CommodityTicker: "MCG", Amount: building.AreaCost * 4 };
+  else
+    yield { CommodityTicker: "AEF", Amount: Math.ceil(building.AreaCost / 3) };
+  if (planet.Pressure > 2)
+    yield { CommodityTicker: "HSE", Amount: 1 };
+  if (planet.Temperature < -25)
+    yield { CommodityTicker: "INS", Amount: building.AreaCost * 10 };
+}
 export {
   CCCTable
 };
 
-//# debugId=093D1E72DAD3DD7A64756E2164756E21
+//# debugId=683AA41A35B7324F64756E2164756E21
