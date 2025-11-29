@@ -1758,8 +1758,8 @@ class CCCTable extends LitElement {
         let traded = 0;
         for (const price of prices)
           if (price.MaterialTicker === ticker && price.ExchangeCode.endsWith("1")) {
-            total += price.PriceAverage * price.TradedYesterday;
-            traded += price.TradedYesterday;
+            total += price.VWAP7D * price.Traded7D;
+            traded += price.Traded7D;
           }
         priceMap.set(ticker, total / traded);
       }
@@ -1895,6 +1895,7 @@ document.querySelector('input[type="button"]').addEventListener("click", async (
   const planet = await planetResponse.json();
   const count = cccTable.count;
   count.clear();
+  const missing = new Map;
   for (const mat of mats(buildings2.get("CM"), planet))
     if (mat.CommodityTicker in reducedPrices) {
       const ticker = mat.CommodityTicker;
@@ -1905,7 +1906,8 @@ document.querySelector('input[type="button"]').addEventListener("click", async (
       if (mat.CommodityTicker in regularPrices) {
         const ticker = mat.CommodityTicker;
         count.set(ticker, (count.get(ticker) ?? 0) + building.amount * mat.Amount);
-      }
+      } else
+        missing.set(mat.CommodityTicker, (missing.get(mat.CommodityTicker) ?? 0) + building.amount * mat.Amount);
   for (const infra of plan.baseplanner.baseplanner_data.infrastructure) {
     if (infra.amount === 0)
       continue;
@@ -1913,9 +1915,15 @@ document.querySelector('input[type="button"]').addEventListener("click", async (
       if (mat.CommodityTicker in regularPrices) {
         const ticker = mat.CommodityTicker;
         count.set(ticker, (count.get(ticker) ?? 0) + infra.amount * mat.Amount);
-      }
+      } else
+        missing.set(mat.CommodityTicker, (missing.get(mat.CommodityTicker) ?? 0) + infra.amount * mat.Amount);
   }
   cccTable.requestUpdate("count");
+  const missingDiv = document.querySelector(".missing");
+  if (missing.size)
+    missingDiv.innerText = Array.from(missing.entries()).map(([ticker, amount]) => `${amount} ${ticker}`).join(", ") + " not included";
+  else
+    missingDiv.innerText = "";
 });
 function* mats(building, planet) {
   for (const mat of building.BuildingCosts)
@@ -1924,13 +1932,22 @@ function* mats(building, planet) {
     yield { CommodityTicker: "MCG", Amount: building.AreaCost * 4 };
   else
     yield { CommodityTicker: "AEF", Amount: Math.ceil(building.AreaCost / 3) };
+  if (planet.Gravity > 2.5)
+    yield { CommodityTicker: "BL", Amount: 1 };
+  else if (planet.Gravity < 0.25)
+    yield { CommodityTicker: "MGC", Amount: 1 };
   if (planet.Pressure > 2)
     yield { CommodityTicker: "HSE", Amount: 1 };
+  else if (planet.Pressure < 0.25)
+    yield { CommodityTicker: "SEA", Amount: building.AreaCost };
   if (planet.Temperature < -25)
     yield { CommodityTicker: "INS", Amount: building.AreaCost * 10 };
+  else if (planet.Temperature > 75)
+    yield { CommodityTicker: "TSH", Amount: 1 };
 }
 export {
   CCCTable
 };
 
-//# debugId=683AA41A35B7324F64756E2164756E21
+//# debugId=F91CDF6492566BE764756E2164756E21
+//# sourceMappingURL=ccc.js.map

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Corriild's Construction Center",
   "scripts": {
-    "build": "bun build src/ccc.ts --outdir dist --target browser --sourcemap=external",
+    "build": "bun build src/ccc.ts --outdir dist --target browser --sourcemap=linked",
     "typecheck": "tsc --noEmit",
     "serve": "python3 -m http.server 8000"
   },
