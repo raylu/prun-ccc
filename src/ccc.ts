@@ -240,6 +240,7 @@ document.querySelector('input[type="button"]')!.addEventListener('click', async 
 
 	const count = cccTable.count;
 	count.clear();
+	const missing = new Map<string, number>();
 	for (const mat of mats(buildings.get('CM')!, planet))
 		if (mat.CommodityTicker in reducedPrices)  {
 			const ticker = mat.CommodityTicker as keyof typeof reducedPrices;
@@ -250,16 +251,24 @@ document.querySelector('input[type="button"]')!.addEventListener('click', async 
 			if (mat.CommodityTicker in regularPrices) {
 				const ticker = mat.CommodityTicker as keyof typeof regularPrices;
 				count.set(ticker, (count.get(ticker) ?? 0) + building.amount * mat.Amount);
-			}
+			} else
+				missing.set(mat.CommodityTicker, (missing.get(mat.CommodityTicker) ?? 0) + building.amount * mat.Amount);
 	for (const infra of plan.baseplanner.baseplanner_data.infrastructure) {
 		if (infra.amount === 0) continue;
 		for (const mat of mats(buildings.get(infra.building)!, planet))
 			if (mat.CommodityTicker in regularPrices) {
 				const ticker = mat.CommodityTicker as keyof typeof regularPrices;
 				count.set(ticker, (count.get(ticker) ?? 0) + infra.amount * mat.Amount);
-			}
+			} else
+				missing.set(mat.CommodityTicker, (missing.get(mat.CommodityTicker) ?? 0) + infra.amount * mat.Amount);
 	}
 	cccTable.requestUpdate('count');
+
+	const missingDiv = document.querySelector('.missing') as HTMLDivElement;
+	if (missing.size)
+		missingDiv.innerText = Array.from(missing.entries()).map(([ticker, amount]) => `${amount} ${ticker}`).join(', ') + ' not included';
+	else
+		missingDiv.innerText = '';
 });
 
 function *mats(building: Building, planet: Planet): Iterable<BuildingMat> {
@@ -271,14 +280,19 @@ function *mats(building: Building, planet: Planet): Iterable<BuildingMat> {
 	else // gaseous
 		yield {CommodityTicker: 'AEF', Amount: Math.ceil(building.AreaCost / 3)};
 
-	// ignore gravity because CCC doesn't have MGC or BL
+	if (planet.Gravity > 2.5)
+		yield {CommodityTicker: 'BL', Amount: 1};
+	else if (planet.Gravity < 0.25)
+		yield {CommodityTicker: 'MGC', Amount: 1};
 
 	if (planet.Pressure > 2)
 		yield {CommodityTicker: 'HSE', Amount: 1};
-	// ignore low pressure because CCC doesn't have SEA
+	else if (planet.Pressure < 0.25)
+		yield {CommodityTicker: 'SEA', Amount: building.AreaCost};
 
-	// Temperature
 	if (planet.Temperature < -25)
 		yield {CommodityTicker: 'INS', Amount: building.AreaCost * 10};
+	else if (planet.Temperature > 75)
+		yield {CommodityTicker: 'TSH', Amount: 1};
 	// ignore high temperature because CCC doesn't have TSH
 }
