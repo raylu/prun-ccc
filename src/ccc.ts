@@ -245,7 +245,8 @@ document.querySelector('input[type="button"]')!.addEventListener('click', async 
 		if (mat.CommodityTicker in reducedPrices)  {
 			const ticker = mat.CommodityTicker as keyof typeof reducedPrices;
 			count.set(ticker, mat.Amount);
-		}
+		} else
+			missing.set(mat.CommodityTicker, (missing.get(mat.CommodityTicker) ?? 0) + mat.Amount);
 	for (const building of plan.baseplanner.baseplanner_data.buildings) 
 		for (const mat of mats(buildings.get(building.name)!, planet)) 
 			if (mat.CommodityTicker in regularPrices) {
