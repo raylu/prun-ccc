@@ -49,8 +49,8 @@ const regularPrices = {
 interface Price {
 	MaterialTicker: string;
 	ExchangeCode: string;
-	PriceAverage: number;
-	TradedYesterday: number;
+	VWAP7D: number;
+	Traded7D: number;
 }
 
 interface Building {
@@ -98,8 +98,8 @@ export class CCCTable extends LitElement {
 				let traded = 0;
 				for (const price of prices)
 					if (price.MaterialTicker === ticker && price.ExchangeCode.endsWith('1')) {
-						total += price.PriceAverage * price.TradedYesterday;
-						traded += price.TradedYesterday;
+						total += price.VWAP7D * price.Traded7D;
+						traded += price.Traded7D;
 					}
 				priceMap.set(ticker, total / traded);
 			}
