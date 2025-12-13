@@ -295,5 +295,4 @@ function *mats(building: Building, planet: Planet): Iterable<BuildingMat> {
 		yield {CommodityTicker: 'INS', Amount: building.AreaCost * 10};
 	else if (planet.Temperature > 75)
 		yield {CommodityTicker: 'TSH', Amount: 1};
-	// ignore high temperature because CCC doesn't have TSH
 }
