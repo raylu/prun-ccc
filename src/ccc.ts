@@ -54,31 +54,30 @@ interface Price {
 }
 
 interface Building {
-	Ticker: string;
-	AreaCost: number;
-	BuildingCosts: BuildingMat[];
+	building_ticker: string;
+	costs: BuildingMat[];
+	area_cost: number;
 }
 
 interface BuildingMat {
-	CommodityTicker: string;
-	Amount: number;
+	material_ticker: string;
+	material_amount: number;
 }
 
 interface Plan {
-	baseplanner: {
-		name: string;
-		baseplanner_data: {
-			planet: {planetid: string}
+	plan_details: {
+		planet_natural_id: string;
+		plan_data: {
 			infrastructure: {building: string, amount: number}[];
 			buildings: {name: string, amount: number}[];
 		}
 	}
 }
 interface Planet {
-	Surface: boolean;
-	Pressure: number;
-	Temperature: number;
-	Gravity: number;
+	surface: boolean;
+	pressure: number;
+	temperature: number;
+	gravity: number;
 }
 
 const fmt = new Intl.NumberFormat(undefined, {maximumFractionDigits: 0});
@@ -218,10 +217,10 @@ if (document.location.hash.slice(1))
 let buildings: Map<string, Building> | null = null;
 async function fetchBuildings(): Promise<Map<string, Building>> {
 	if (buildings) return buildings;
-	const rawBuildings = await (await fetch('https://api.prunplanner.org/data/buildings')).json() as Building[];
+	const rawBuildings = await (await fetch('https://api.prunplanner.org/data/buildings/')).json() as Building[];
 	buildings = new Map<string, Building>();
 	for (const building of rawBuildings)
-		buildings.set(building.Ticker, building);
+		buildings.set(building.building_ticker, building);
 	return buildings;
 }
 document.querySelector('input[type="button"]')!.addEventListener('click', async () => {
@@ -231,37 +230,38 @@ document.querySelector('input[type="button"]')!.addEventListener('click', async 
 		return;
 	}
 	url.hostname = 'api.prunplanner.org';
+	url.pathname = `planning${url.pathname}/`;
 	const [planResponse, buildings] = await Promise.all([fetch(url), fetchBuildings()]);
 	const plan = await planResponse.json() as Plan;
 
 	const planetResponse = await fetch('https://api.prunplanner.org/data/planet/' +
-		plan.baseplanner.baseplanner_data.planet.planetid);
+		plan.plan_details.planet_natural_id + '/');
 	const planet: Planet = await planetResponse.json();
 
 	const count = cccTable.count;
 	count.clear();
 	const missing = new Map<string, number>();
 	for (const mat of mats(buildings.get('CM')!, planet))
-		if (mat.CommodityTicker in reducedPrices)  {
-			const ticker = mat.CommodityTicker as keyof typeof reducedPrices;
-			count.set(ticker, mat.Amount);
+		if (mat.material_ticker in reducedPrices)  {
+			const ticker = mat.material_ticker as keyof typeof reducedPrices;
+			count.set(ticker, mat.material_amount);
 		} else
-			missing.set(mat.CommodityTicker, (missing.get(mat.CommodityTicker) ?? 0) + mat.Amount);
-	for (const building of plan.baseplanner.baseplanner_data.buildings) 
-		for (const mat of mats(buildings.get(building.name)!, planet)) 
-			if (mat.CommodityTicker in regularPrices) {
-				const ticker = mat.CommodityTicker as keyof typeof regularPrices;
-				count.set(ticker, (count.get(ticker) ?? 0) + building.amount * mat.Amount);
+			missing.set(mat.material_ticker, (missing.get(mat.building_ticker) ?? 0) + mat.material_amount);
+	for (const building of plan.plan_details.plan_data.buildings)
+		for (const mat of mats(buildings.get(building.name)!, planet))
+			if (mat.material_ticker in regularPrices) {
+				const ticker = mat.material_ticker as keyof typeof regularPrices;
+				count.set(ticker, (count.get(ticker) ?? 0) + building.amount * mat.material_amount);
 			} else
-				missing.set(mat.CommodityTicker, (missing.get(mat.CommodityTicker) ?? 0) + building.amount * mat.Amount);
-	for (const infra of plan.baseplanner.baseplanner_data.infrastructure) {
+				missing.set(mat.material_ticker, (missing.get(mat.material_ticker) ?? 0) + building.amount * mat.material_amount);
+	for (const infra of plan.plan_details.plan_data.infrastructure) {
 		if (infra.amount === 0) continue;
 		for (const mat of mats(buildings.get(infra.building)!, planet))
-			if (mat.CommodityTicker in regularPrices) {
-				const ticker = mat.CommodityTicker as keyof typeof regularPrices;
-				count.set(ticker, (count.get(ticker) ?? 0) + infra.amount * mat.Amount);
+			if (mat.material_ticker in regularPrices) {
+				const ticker = mat.material_ticker as keyof typeof regularPrices;
+				count.set(ticker, (count.get(ticker) ?? 0) + infra.amount * mat.material_amount);
 			} else
-				missing.set(mat.CommodityTicker, (missing.get(mat.CommodityTicker) ?? 0) + infra.amount * mat.Amount);
+				missing.set(mat.material_ticker, (missing.get(mat.material_ticker) ?? 0) + infra.amount * mat.material_amount);
 	}
 	cccTable.requestUpdate('count');
 
@@ -273,26 +273,26 @@ document.querySelector('input[type="button"]')!.addEventListener('click', async 
 });
 
 function *mats(building: Building, planet: Planet): Iterable<BuildingMat> {
-	for (const mat of building.BuildingCosts)
+	for (const mat of building.costs)
 		yield mat;
 
-	if (planet.Surface) // rocky
-		yield {CommodityTicker: 'MCG', Amount: building.AreaCost * 4};
+	if (planet.surface) // rocky
+		yield {material_ticker: 'MCG', material_amount: building.area_cost * 4};
 	else // gaseous
-		yield {CommodityTicker: 'AEF', Amount: Math.ceil(building.AreaCost / 3)};
+		yield {material_ticker: 'AEF', material_amount: Math.ceil(building.area_cost / 3)};
 
-	if (planet.Gravity > 2.5)
-		yield {CommodityTicker: 'BL', Amount: 1};
-	else if (planet.Gravity < 0.25)
-		yield {CommodityTicker: 'MGC', Amount: 1};
+	if (planet.gravity > 2.5)
+		yield {material_ticker: 'BL', material_amount: 1};
+	else if (planet.gravity < 0.25)
+		yield {material_ticker: 'MGC', material_amount: 1};
 
-	if (planet.Pressure > 2)
-		yield {CommodityTicker: 'HSE', Amount: 1};
-	else if (planet.Pressure < 0.25)
-		yield {CommodityTicker: 'SEA', Amount: building.AreaCost};
+	if (planet.pressure > 2)
+		yield {material_ticker: 'HSE', material_amount: 1};
+	else if (planet.pressure < 0.25)
+		yield {material_ticker: 'SEA', material_amount: building.area_cost};
 
-	if (planet.Temperature < -25)
-		yield {CommodityTicker: 'INS', Amount: building.AreaCost * 10};
-	else if (planet.Temperature > 75)
-		yield {CommodityTicker: 'TSH', Amount: 1};
+	if (planet.temperature < -25)
+		yield {material_ticker: 'INS', material_amount: building.area_cost * 10};
+	else if (planet.temperature > 75)
+		yield {material_ticker: 'TSH', material_amount: 1};
 }
