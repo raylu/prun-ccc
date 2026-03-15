@@ -1,6 +1,6 @@
 {
-  "name": "prun-cccc",
-  "version": "1.0.0",
+  "name": "prun-ccc",
+  "version": "0",
   "description": "Corriild's Construction Center",
   "scripts": {
     "build": "bun build src/ccc.ts --outdir dist --target browser --sourcemap=linked",
